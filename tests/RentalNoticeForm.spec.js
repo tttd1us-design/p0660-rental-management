@@ -30,7 +30,7 @@ describe('RentalNoticeForm 4단계 입력 폼', () => {
     const wrapper = mount(RentalNoticeForm);
     const steps = wrapper.findAll('.step-item .step-title').map((n) => n.text());
 
-    expect(steps).toEqual(['미납 감지', '필수 고지', '내용증명', '법적 절차']);
+    expect(steps).toEqual(['미납 감지', '부드러운 독촉', '법적 경고', '법적 절차']);
     expect(wrapper.text()).toContain('D+1');
     expect(wrapper.text()).toContain('내용증명');
     expect(wrapper.text()).toContain('명도소송');
@@ -53,8 +53,8 @@ describe('RentalNoticeForm 4단계 입력 폼', () => {
     await wrapper.find('#accountNumber').setValue('123-456-7890123');
     await submitForm(wrapper);
 
-    expect(activeStep(wrapper)).toBe('필수 고지');
-    expect(cardTitle(wrapper)).toBe('필수 고지');
+    expect(activeStep(wrapper)).toBe('부드러운 독촉');
+    expect(cardTitle(wrapper)).toBe('부드러운 독촉');
     expect(wrapper.text()).toContain('홍길동');
     expect(wrapper.text()).toContain('3개월');
     expect(wrapper.text()).toContain('123-456-7890123');

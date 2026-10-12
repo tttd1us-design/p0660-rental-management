@@ -12,9 +12,9 @@ import { ref, computed, watch } from 'vue';
  */
 const STEPS = [
   { id: 1, title: '미납 감지', subtitle: 'D+1 · 미납 정보 입력', icon: '📋' },
-  { id: 2, title: '필수 고지', subtitle: '문자 · 카톡 고지', icon: '✉️' },
-  { id: 3, title: '내용증명', subtitle: 'PDF 생성 · 발송 준비', icon: '📄' },
-  { id: 4, title: '법적 절차', subtitle: '명도소송 · 지급명령', icon: '⚖️' },
+  { id: 2, title: '부드러운 독촉', subtitle: '카톡 · 문자 고지서', icon: '✉️' },
+  { id: 3, title: '법적 경고', subtitle: '내용증명 PDF 생성', icon: '📄' },
+  { id: 4, title: '법적 절차', subtitle: '명도소송 · 지급명령 연결', icon: '⚖️' },
 ];
 
 const step = ref(1);

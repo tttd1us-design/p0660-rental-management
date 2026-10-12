@@ -5,6 +5,9 @@ node_modules/
 dist/
 coverage/
 
+# 검증 스크립트가 만든 임시 PDF·미리보기
+.probe/
+
 # 로그
 npm-debug.log*
 yarn-debug.log*

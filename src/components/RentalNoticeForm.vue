@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { buildNoticeContent } from '../lib/legalEngine.js';
+import { downloadNoticePdf } from '../lib/noticePdf.js';
 
 /**
  * P-0660 임대관리 4단계 입력 폼
@@ -23,6 +25,11 @@ const tenantName = ref('');
 const address = ref('');
 const monthsArrears = ref('');
 const accountNumber = ref('');
+// 임대차 유형(주택/상가) — 유형에 따라 자동 삽입되는 법령 조항이 달라진다. 기본은 주택.
+const leaseType = ref('housing');
+// 임대인(발신인) 정보 — 선택 입력. 비워 두면 기본값으로 채운다.
+const landlordName = ref('');
+const landlordPhone = ref('');
 
 const errors = ref({
   tenantName: '',
@@ -96,6 +103,11 @@ const resetForm = () => {
   address.value = '';
   monthsArrears.value = '';
   accountNumber.value = '';
+  leaseType.value = 'housing';
+  landlordName.value = '';
+  landlordPhone.value = '';
+  pdfMessage.value = '';
+  pdfError.value = '';
   errors.value = {
     tenantName: '',
     address: '',
@@ -129,6 +141,52 @@ const letterText = computed(() => {
     '임대인 귀하',
   ].join('\n');
 });
+
+/**
+ * 3단계에서 쓰는 내용증명 구조.
+ * 입력값을 legalEngine 에 넣으면, 연체 개월수와 임대차 유형에 맞는
+ * 법령 조항(민법 제640조 · 주택임대차보호법 · 상가건물 임대차보호법)이 자동으로 채워진다.
+ */
+const notice = computed(() => {
+  if (!isFilled.value) return null;
+  return buildNoticeContent({
+    tenantName: asText(tenantName.value),
+    address: asText(address.value),
+    monthsArrears: asText(monthsArrears.value),
+    accountNumber: asText(accountNumber.value),
+    leaseType: leaseType.value,
+    landlordName: asText(landlordName.value),
+    landlordPhone: asText(landlordPhone.value),
+  });
+});
+
+const pdfBusy = ref(false);
+const pdfMessage = ref('');
+const pdfError = ref('');
+
+/** 3단계: 내용증명 PDF 를 만들어 바로 내려받는다. */
+const downloadPdf = async () => {
+  if (pdfBusy.value || !notice.value) return;
+  pdfBusy.value = true;
+  pdfMessage.value = '';
+  pdfError.value = '';
+  try {
+    const { fileName } = await downloadNoticePdf({
+      tenantName: asText(tenantName.value),
+      address: asText(address.value),
+      monthsArrears: asText(monthsArrears.value),
+      accountNumber: asText(accountNumber.value),
+      leaseType: leaseType.value,
+      landlordName: asText(landlordName.value),
+      landlordPhone: asText(landlordPhone.value),
+    });
+    pdfMessage.value = `내용증명 PDF를 저장했습니다: ${fileName}`;
+  } catch (error) {
+    pdfError.value = `PDF 생성에 실패했습니다: ${error.message}`;
+  } finally {
+    pdfBusy.value = false;
+  }
+};
 
 watch(
   () => step.value,
@@ -255,6 +313,49 @@ watch(
             </p>
           </div>
 
+          <div class="field">
+            <label for="leaseType">임대차 유형 *</label>
+            <select
+              id="leaseType"
+              v-model="leaseType"
+            >
+              <option value="housing">
+                주택 (주택임대차보호법 · 2기 연체 기준)
+              </option>
+              <option value="commercial">
+                상가 (상가건물 임대차보호법 · 3기 연체 기준)
+              </option>
+            </select>
+            <p class="hint">
+              유형에 따라 자동으로 들어가는 법령 조항이 달라집니다.
+            </p>
+          </div>
+
+          <div class="field">
+            <label for="landlordName">임대인명 (선택)</label>
+            <input
+              id="landlordName"
+              v-model="landlordName"
+              type="text"
+              placeholder="예: 김임대"
+              autocomplete="off"
+            >
+            <p class="hint">
+              비워 두면 '임대인'으로 표기됩니다.
+            </p>
+          </div>
+
+          <div class="field">
+            <label for="landlordPhone">임대인 연락처 (선택)</label>
+            <input
+              id="landlordPhone"
+              v-model="landlordPhone"
+              type="text"
+              placeholder="예: 010-1234-5678"
+              autocomplete="off"
+            >
+          </div>
+
           <div class="actions">
             <button
               type="button"
@@ -340,47 +441,124 @@ watch(
         </p>
 
         <p class="intro">
-          아래 내용을 출력하여 내용증명 우편으로 발송할 수 있습니다. (인쇄 가능)
+          입력하신 정보를 바탕으로 <strong>법령 조항이 자동으로 들어간</strong> 내용증명을 만듭니다.
+          아래 미리보기를 확인한 뒤 PDF로 내려받으세요.
         </p>
 
-        <article class="letter">
+        <article
+          v-if="notice"
+          class="letter"
+        >
           <header class="letter-header">
             <p class="letter-title">
-              내 용 증 명
+              {{ notice.title }}
+            </p>
+            <p class="letter-subtitle">
+              {{ notice.subtitle }}
             </p>
             <p class="letter-date">
-              {{ new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+              {{ notice.issueDateText }} · 문서번호 {{ notice.documentNumber }}
             </p>
           </header>
           <section class="letter-body">
             <p class="letter-box">
-              <span class="label">임차인</span>
-              <span class="value">{{ tenantName }}</span>
+              <span class="label">수신 (임차인)</span>
+              <span class="value">{{ notice.tenant.name }} — {{ notice.tenant.address }}</span>
             </p>
             <p class="letter-box">
-              <span class="label">주소</span>
-              <span class="value">{{ address }}</span>
+              <span class="label">발신 (임대인)</span>
+              <span class="value">{{ notice.landlord.name }}<template v-if="notice.landlord.phone"> ({{ notice.landlord.phone }})</template></span>
             </p>
             <p class="letter-box">
               <span class="label">미납 기간</span>
-              <span class="value">{{ monthsArrears }}개월</span>
+              <span class="value">{{ notice.months }}개월 · {{ notice.arrears.severity }}</span>
             </p>
             <p class="letter-box">
-              <span class="label">미납 사유</span>
-              <span class="value">차임 연체 (건물 임대계약 해지 통지)</span>
-            </p>
-            <p class="letter-body-text">
-              본인은 2026년 10월 기준으로 귀 임차인이 아래의 임대물건을 점유·사용하며 차임을 3기 이상 연체하고 있음을 확인합니다. 이에 본인은 귀 임차인에 대하여 상당한 기간을 정하여 차임의 지급 및 목적물의 반환을 최고하며, 만일 이행이 없을 때에는 부득이 관련 법령 및 임대차계약에 따라 내용증명 발송, 명도소송, 지급명령 등 법적 절차에 나아갈 것임을 통지합니다.
+              <span class="label">연체 요건</span>
+              <span class="value">{{ notice.arrears.lawName }} {{ notice.arrears.thresholdText }} — {{ notice.arrears.met ? '요건 충족 (해지·갱신거절 가능)' : '요건 미달 (' + notice.arrears.shortage + '개월 부족)' }}</span>
             </p>
             <p class="letter-box">
-              <span class="label">계좌번호(연체료 공제 대상)</span>
-              <span class="value">{{ accountNumber }}</span>
+              <span class="label">계좌번호</span>
+              <span class="value">{{ notice.accountNumber || accountNumber }}</span>
             </p>
+
+            <ol class="notice-paragraphs">
+              <li
+                v-for="(fact, index) in notice.facts"
+                :key="'fact-' + index"
+              >
+                {{ fact }}
+              </li>
+            </ol>
+
+            <h4 class="letter-section-title">
+              법령 근거
+            </h4>
+            <ul class="legal-basis">
+              <li
+                v-for="(basis, index) in notice.legalBasis"
+                :key="'basis-' + index"
+              >
+                {{ basis }}
+              </li>
+            </ul>
+
+            <h4 class="letter-section-title">
+              요구 사항
+            </h4>
             <p class="letter-body-text">
-              위 사항을 이행하지 않을 경우, 임대인은 다음 조치를 진행할 수 있습니다: ① 내용증명 우편 발송, ② 명도소송 제기, ③ 지급명령 신청, ④ 부동산 강제 집행.
+              {{ notice.demandIntro }}
+            </p>
+            <ol class="notice-paragraphs">
+              <li
+                v-for="(demand, index) in notice.demands"
+                :key="'demand-' + index"
+              >
+                {{ demand }}
+              </li>
+            </ol>
+
+            <p class="letter-body-text">
+              {{ notice.warning }}
+            </p>
+
+            <h4 class="letter-section-title">
+              이행이 없을 경우의 법적 절차
+            </h4>
+            <ol class="notice-paragraphs">
+              <li
+                v-for="remedy in notice.remedies"
+                :key="'remedy-' + remedy.step"
+              >
+                <strong>{{ remedy.title }}</strong> — {{ remedy.detail }}
+              </li>
+            </ol>
+
+            <p class="letter-body-text">
+              {{ notice.closing }}
+            </p>
+
+            <p class="letter-signature">
+              {{ notice.issueDateText }} · 임대인 {{ notice.landlord.name }} (인)
+            </p>
+            <p class="letter-disclaimer">
+              {{ notice.disclaimer }}
             </p>
           </section>
         </article>
+
+        <p
+          v-if="pdfMessage"
+          class="pdf-message"
+        >
+          {{ pdfMessage }}
+        </p>
+        <p
+          v-if="pdfError"
+          class="error"
+        >
+          {{ pdfError }}
+        </p>
 
         <div class="actions">
           <button
@@ -389,6 +567,14 @@ watch(
             @click="prevStep"
           >
             이전
+          </button>
+          <button
+            type="button"
+            class="btn btn-download"
+            :disabled="pdfBusy"
+            @click="downloadPdf"
+          >
+            {{ pdfBusy ? 'PDF 생성 중…' : '📥 내용증명 PDF 다운로드' }}
           </button>
           <button
             type="button"
@@ -685,9 +871,13 @@ watch(
   margin-bottom: 10px;
 }
 
-.notice-body,
-.letter-body {
+.notice-body {
   white-space: pre-line;
+  line-height: 1.7;
+  font-size: 0.95rem;
+}
+
+.letter-body {
   line-height: 1.7;
   font-size: 0.95rem;
 }
@@ -825,6 +1015,90 @@ watch(
   font-size: 0.78rem;
   color: #94a3b8;
   line-height: 1.6;
+}
+
+.field select {
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  background: #ffffff;
+  transition: border-color 0.2s;
+}
+
+.field select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.letter-subtitle {
+  font-size: 0.9rem;
+  color: #475569;
+  margin-top: 4px;
+}
+
+.letter-section-title {
+  margin: 18px 0 8px;
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.notice-paragraphs,
+.legal-basis {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.75;
+  font-size: 0.92rem;
+}
+
+.notice-paragraphs li,
+.legal-basis li {
+  margin-bottom: 6px;
+}
+
+.letter-body-text {
+  margin: 12px 0;
+  line-height: 1.75;
+  font-size: 0.92rem;
+}
+
+.letter-signature {
+  margin-top: 20px;
+  text-align: right;
+  font-weight: 700;
+}
+
+.letter-disclaimer {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.pdf-message {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 0.9rem;
+}
+
+.btn-download {
+  background: #059669;
+  color: #ffffff;
+}
+
+.btn-download:hover:not(:disabled) {
+  background: #047857;
+}
+
+.btn-download:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 @media (max-width: 600px) {

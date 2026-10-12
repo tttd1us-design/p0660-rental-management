@@ -27,4 +27,11 @@ export default [
       'vue/multi-word-component-names': 'off',
     },
   },
+  {
+    // 개발용 검증 스크립트(scripts/*.mjs)는 결과를 눈으로 확인해야 하므로 console 사용을 허용한다.
+    files: ['scripts/**/*.{js,mjs}'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ];

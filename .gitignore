@@ -3,6 +3,7 @@ node_modules/
 
 # 빌드 산출물
 dist/
+!dist/
 coverage/
 
 # 검증 스크립트가 만든 임시 PDF·미리보기

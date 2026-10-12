@@ -1,0 +1,28 @@
+{
+  "name": "p0660-rental-management",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "P-0660 임대관리 MVP — 4단계 입력 폼 (미납 감지 → 필수 고지 → 내용증명 PDF → 명도소송/지급명령 연결)",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "vue": "^3.5.12"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
+    "@vue/test-utils": "^2.5.1",
+    "eslint": "^9.24.0",
+    "eslint-plugin-vue": "^9.32.0",
+    "jsdom": "^26.0.0",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.5"
+  }
+}
